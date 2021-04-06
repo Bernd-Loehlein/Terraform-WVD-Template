@@ -38,7 +38,7 @@ resource "azurerm_windows_virtual_machine" "Session-Host" {
     os_disk {
         name                    = "${var.session_host_prefix}-${count.index}-os-disk"
         caching                 = "ReadWrite"
-        storage_account_type    = var.os_disk_type
+        storage_account_type    = var.os_disk_type == null ? "StandardSSD_LRS" : var.os_disk_type
     }
 
     source_image_id             = var.source_image_id == null ? null : var.source_image_id
@@ -119,19 +119,25 @@ resource "azurerm_virtual_machine_extension" "WVD-DSC" {
     type_handler_version        = "2.80"
     auto_upgrade_minor_version  = true
     depends_on                  = [azurerm_virtual_machine_extension.LogAnalytics, azurerm_virtual_machine_extension.DomainJoin]
-    settings                    = <<SETTINGS
-{
-    "configuration" : {
-        "url": "https://wvdportalstorageblob.blob.core.windows.net/galleryartifacts/Configuration.zip",
-        "script": "Configuration.ps1",
-        "function": "AddSessionHost"
-    },
-    "configurationArguments": {
-        "HostPoolName": "${var.hostpool_name}",
-        "RegistrationInfoToken": "${var.hostpool_token}"
+    settings                    = <<-SETTINGS
+    {
+        "configuration" : {
+            "url": "https://wvdportalstorageblob.blob.core.windows.net/galleryartifacts/Configuration.zip",
+            "script": "Configuration.ps1",
+            "function": "AddSessionHost"
+        },
+        "configurationArguments": {
+            "HostPoolName": "${var.hostpool_name}"
+        }
     }
-}
-SETTINGS
+    SETTINGS
+    protected_settings = <<-PROTECTED_SETTINGS
+    {
+        "configurationArguments" : {
+            "registrationInfoToken": "${var.hostpool_token}" 
+        }
+    }
+    PROTECTED_SETTINGS
 }
 
 resource "azurerm_virtual_machine_extension" "GPU-Drivers" {
